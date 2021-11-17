@@ -1,0 +1,13 @@
+https://api.github.com/search/repositories?q=deep%20learning&page,per_page,sort,order
+
+(deep%20learning 부분만 수정해서) self%20driving, digital%20human
+
+
+
+각 레포마다 
+레포지토리 이름, type, created_at, 숫자로 돼있는거(size, stargazers_count, ...., forks_count)
+owner->login
+
+
+
+다음주 초까지
