@@ -3,7 +3,7 @@
 ## Packages
 1. sklearn(TfidfVectorizer, CountVectorizer, PCA)
 2. KMeans
-3. DBSCAN!
+3. DBSCAN
 4. 
 5. 
 6. 
@@ -19,7 +19,7 @@
 
 
 ## 연구 절차 (Research Proceduer)
-[Uploading 스크린샷 2022-03-02 오후 3.26.33.png…]()
+<img width="525" alt="스크린샷 2022-03-02 오후 3 49 56" src="https://user-images.githubusercontent.com/87521259/156309915-04dd1918-b0c1-4f0c-b8f3-0fd2284caf04.png">
 
 1. 데이터 수집 및 전처리
 
@@ -31,7 +31,7 @@
   
   <img width="1273" alt="스크린샷 2022-03-02 오후 3 47 13" src="https://user-images.githubusercontent.com/87521259/156309578-501ba7dd-f673-44b4-8742-2ab95e4c2e00.png">
 
-  2) API 이용하여 필요한 저장소 정보 Crawling
+  2) API 이용하여 필요한 저장소 정보 Crawling test
   ```
   def topic(t):
     
@@ -67,16 +67,69 @@
         fork_lst.append(fork)
         login_lst.append(login)
 
-#         print('{} / {} / {} / {} / {} / {} / {}'.format(name, typ, create, size, star, fork, login))
-
     df = pd.DataFrame([name_lst, type_lst, create_lst, size_lst, star_lst, fork_lst, login_lst])
     df = df.transpose()
     df.columns = ['name','type','created_at','size','stargazers_count','fork','login']
     return df
  
  # test
-topic('deep learning')
+ topic('deep learning')
  ```
  <img width="852" alt="스크린샷 2022-03-02 오후 3 48 58" src="https://user-images.githubusercontent.com/87521259/156309815-3d802eca-173e-4956-a84f-0e02e350bb27.png">
 
- 
+  3) 전체 페이지 Json 형태로 response, Crawling 및 Excel 형태 저장
+  - Github 자체에서 인터페이스 기반의 페이지 변화와 자동 크롤링 방지를 위한 요청시간 확인 등의 이슈사항 존재 : time.sleep() 함수를 통해 대기시간 발생시켜 반복적인 동적 Crawling
+  ```
+  def topic(t):
+    
+    topic = t.replace(' ', '%20')
+    name_lst = []
+    type_lst = []
+    create_lst = []
+    size_lst = []
+    star_lst = []
+    fork_lst = []
+    login_lst = []
+        
+    for i in range(1,11):
+        
+        try:
+            response = urlopen('https://api.github.com/search/repositories?q={}&sort=stars&per_page=100&page={}'.format(topic, i)).read().decode('utf-8')
+        except:
+            time.sleep(10)
+            
+        responseJson = json.loads(response)
+
+        print(f'{i} response')
+
+        items = responseJson.get('items')
+        
+        for lst in items:
+            name = lst.get('name')
+            typ = lst.get('owner').get('type')
+            create = lst.get('created_at')
+            size = lst.get('size')
+            star = lst.get('stargazers_count')
+            fork = lst.get('forks_count')
+            login = lst.get('owner').get('login')
+
+            name_lst.append(name)
+            type_lst.append(typ)
+            create_lst.append(create)
+            size_lst.append(size)
+            star_lst.append(star)
+            fork_lst.append(fork)
+            login_lst.append(login)
+
+#         print('{} / {} / {} / {} / {} / {} / {}'.format(name, typ, create, size, star, fork, login))
+
+    df = pd.DataFrame([name_lst, type_lst, create_lst, size_lst, star_lst, fork_lst, login_lst])
+    df = df.transpose()
+    df.columns = ['name','type','created_at','size','stargazers_count','fork','login']
+    return df
+  
+  # test
+  topic('deep learning')
+  ```
+  <img width="817" alt="스크린샷 2022-03-02 오후 4 30 11" src="https://user-images.githubusercontent.com/87521259/156315060-db89266d-baa6-4450-b07c-eb6212785f3f.png">
+
