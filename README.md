@@ -354,7 +354,201 @@ set(result2)
   #### 2) 빅테크 기업 저장소 분석
   
 
+   - 검색할 기업이름 기준 정보 수집
+
+```
+# org = ["aws","facebook","google","naver","kakao","apple","alibaba","tencent","baidu","microsoft","samsung"]
+org = list(input("검색하실 기업이름을 영어로 입력해주세요.(여러개 인경우 띄어쓰기로 구분하여 입력) : ").split())
+org_dic={}
+for o in org:
+    url = "https://github.com/orgs/{}/repositories".format(o)
+    print("{} 에 대한 정보 수집 시작.".format(url))
+    res= requests.get(url)
+    try:
+        res.raise_for_status()
+    except:
+        print("입력하신 기업\"{}\" 에 대한 정보가 존재하지 않습니다.\n".format(o))
+        continue
+    soup=BeautifulSoup(res.text,"lxml")
+    try:
+        max_page = int(soup.find("div",attrs={"role":"navigation"}).find_all("a")[-2].get_text())
+    except:
+        max_page = 1
+    item_temp = []
+    for p in range(1,max_page+1):
+        time.sleep(1)
+        url = "https://github.com/orgs/{}/repositories?page={}".format(o,p)
+        res= requests.get(url)
+        res.raise_for_status()
+        soup=BeautifulSoup(res.text,"lxml")
+        print("{}{}수집시작{}".format("*"*10,o,"*"*10))
+        for item in soup.find("div",attrs={"class":"org-repos repo-list"}).find_all("li",attrs={"class":"Box-row"}):
+            print(item.a.get_text().strip())
+            item_temp.append(item.a.get_text().strip())
+    org_dic[o]=item_temp
+    print()
+```
+<img width="598" alt="스크린샷 2022-05-08 오후 11 02 37" src="https://user-images.githubusercontent.com/87521259/167299903-fc425718-b5fd-414c-92f8-02632874ef2a.png">
 
 
+   - DBSCAN Clustering
 
+```
+for o in org:
+    print("{} {} DBSCAN 클러스터링 시작 {}".format("*"*10,o,"*"*10))
+    excel_name = "{}_vectors.xlsx".format(o)
+    df_org = pd.read_excel("{}.xlsx".format(o))
+    df_vector = pd.read_excel(excel_name)
+    # eps 값을 조정해나가면서 클러스터링을 해야 더 정확한 결과가 나온다
+    dbscan = DBSCAN(eps = 0.3)
+    dbscan_cluster = dbscan.fit_predict(df_vector)
+    dbscan_cluster
+    dbscan_clustered_dic = {}
+    dbscan_clustered_list = []
+    dbscan_cluster_num = len(set(dbscan_cluster))
+    
+    
+    for idx,i in enumerate(dbscan_cluster):
+        if i not in dbscan_clustered_dic:
+            dbscan_clustered_dic[i] = [df_org['ProjectName'][idx]]
+        else:
+            dbscan_clustered_dic[i].append(df_org['ProjectName'][idx])
+
+    # 클러스터링이 된 패키지들
+    # 20개의 군집으로 생성
+
+    dbscan_clustered_dic = sorted(dbscan_clustered_dic.items(), key=lambda x: x[0])
+
+    df_dbscan_cluster = pd.DataFrame(dbscan_clustered_dic,columns=['num','clusters'])
+    dbscan_cluster_num = [len(i) for i in df_dbscan_cluster['clusters']]
+    df_dbscan_cluster['cluster_num'] = dbscan_cluster_num
+    topic_dbscan_clustered_list = []
+    for i in df_dbscan_cluster['clusters']:
+        temp_dic = {}
+        for j in i:
+            topics = df_org[df_org['ProjectName']==j]['Topics'].values[0].replace("[","").replace("]","").replace("'","").strip().split(",")
+            for i in topics:
+                if len(i)==0:
+                    continue
+                i = same_things(i)
+                if i not in temp_dic:
+                    temp_dic[i] = 1
+                else:
+                    temp_dic[i] += 1
+        temp_dic = sorted(temp_dic.items(), key=lambda x: x[1], reverse=True)
+    #     print(temp_dic[:15]) # 상위 15개만 보여줌
+    #     print()
+        topic_dbscan_clustered_list.append(temp_dic[:15])
+    df_dbscan_cluster['top_15_topics'] = topic_dbscan_clustered_list
+    df_dbscan_cluster.to_excel("{}_DBSCAN_clusters.xlsx".format(o),index=False)
+    print(df_dbscan_cluster)
+    print("{}_DBSCAN_clusters.xlsx".format(o),"저장완료")
+    print("*"*50)
+    
+```
+<img width="677" alt="스크린샷 2022-05-08 오후 11 04 03" src="https://user-images.githubusercontent.com/87521259/167299961-e43f224c-8c38-4cac-b4cd-a59f396d91ea.png">
+
+
+  #### 3) 미래기술 저장소 분석
+  
+
+   - 검색할 기술 이름 기준 정보 수집
+
+```
+topic_name = input("기술명을 입력해 주세요. : ")
+url = "https://github.com/topics/{}?o=desc&s=stars".format(topic_name)
+# 내 컴퓨터의 User_Agent
+res= requests.get(url)
+res.raise_for_status()
+soup=BeautifulSoup(res.text,"lxml")
+soup
+options = webdriver.ChromeOptions()
+# headless option임
+
+options.add_argument("headless")
+browser = webdriver.Chrome("./chromedriver",options=options)
+# browser = webdriver.Chrome("./chromedriver")
+browser.get(url)
+soup = BeautifulSoup(browser.page_source,'lxml')
+# Load more 을 몇번 누를것인지??
+# 임의로 100번을 했지만 star수가 예를들어 x개 이상일때까지 Load_more버튼을 누르는 식으로도 가능
+Load_more_times = 100
+for _ in range(Load_more_times):
+    prev = len(soup.find_all("article",attrs={"class":"border rounded color-shadow-small color-bg-subtle my-4"}))
+    try:
+        browser.find_element_by_xpath("//*[@id=\"js-pjax-container\"]/div[2]/div[2]/div/div[1]/form/button").click()
+    except:
+        print("End")
+        break
+    while 1:
+        soup = BeautifulSoup(browser.page_source,'lxml')
+        if prev < len(soup.find_all("article",attrs={"class":"border rounded color-shadow-small color-bg-subtle my-4"})):
+            prev = len(soup.find_all("article",attrs={"class":"border rounded color-shadow-small color-bg-subtle my-4"}))
+            break
+    print(prev,"개 load 완료.")
+    
+# Topic들을 Crawling후 나열 
+soup = BeautifulSoup(browser.page_source,'lxml')
+topics = soup.find_all("h3",attrs={"class":"f3 color-fg-muted text-normal lh-condensed"})
+topic_ads = []
+for i in topics:
+    topic_ad = "".join(i.get_text().strip().replace("\n","").split()) 
+    topic_ads.append(topic_ad)
+```
+<img width="303" alt="스크린샷 2022-05-08 오후 11 06 24" src="https://user-images.githubusercontent.com/87521259/167300051-915c5e4c-811d-434e-89a1-a3aa5e4eefb8.png">
+
+   - DBSCAN Clustering
+
+```
+print("{} {} DBSCAN 클러스터링 시작 {}".format("*"*10,topic_name,"*"*10))
+excel_name = "keyword({})_vectors.xlsx".format(topic_name)
+df_vector = pd.read_excel(excel_name)
+# eps 값을 조정해나가면서 클러스터링을 해야 더 정확한 결과가 나온다
+dbscan = DBSCAN(eps = 0.3)
+dbscan_cluster = dbscan.fit_predict(df_vector)
+dbscan_cluster
+dbscan_clustered_dic = {}
+dbscan_clustered_list = []
+dbscan_cluster_num = len(set(dbscan_cluster))
+
+
+for idx,i in enumerate(dbscan_cluster):
+    if i not in dbscan_clustered_dic:
+        dbscan_clustered_dic[i] = [df_topic['project_name'][idx]]
+    else:
+        dbscan_clustered_dic[i].append(df_topic['project_name'][idx])
+
+# 클러스터링이 된 패키지들
+# 20개의 군집으로 생성
+
+dbscan_clustered_dic = sorted(dbscan_clustered_dic.items(), key=lambda x: x[0])
+
+df_dbscan_cluster = pd.DataFrame(dbscan_clustered_dic,columns=['num','clusters'])
+dbscan_cluster_num = [len(i) for i in df_dbscan_cluster['clusters']]
+df_dbscan_cluster['cluster_num'] = dbscan_cluster_num
+topic_dbscan_clustered_list = []
+for i in df_dbscan_cluster['clusters']:
+    temp_dic = {}
+    for j in i:
+        topics = df_topic[df_topic['project_name']==j]['topic_keyword'].values[0]
+        for i in topics:
+            if len(i)==0:
+                continue
+            i = same_things(i)
+            if i not in temp_dic:
+                temp_dic[i] = 1
+            else:
+                temp_dic[i] += 1
+    temp_dic = sorted(temp_dic.items(), key=lambda x: x[1], reverse=True)
+#     print(temp_dic[:15]) # 상위 15개만 보여줌
+#     print()
+    topic_dbscan_clustered_list.append(temp_dic[:15])
+df_dbscan_cluster['top_15_topics'] = topic_dbscan_clustered_list
+df_dbscan_cluster.to_excel("{}_DBSCAN_clusters.xlsx".format(topic_name),index=False)
+print(df_dbscan_cluster)
+print("{}_DBSCAN_clusters.xlsx".format(topic_name),"저장완료")
+print("*"*50)
+
+```
+<img width="656" alt="스크린샷 2022-05-08 오후 11 07 04" src="https://user-images.githubusercontent.com/87521259/167300066-9ebf66ca-9e55-4c78-9faf-c74878e81999.png">
 
