@@ -4,9 +4,6 @@
 1. sklearn(TfidfVectorizer, CountVectorizer, PCA)
 2. KMeans
 3. DBSCAN
-4. 
-5. 
-6. 
 
 ## Index
 - Research Proceduer
